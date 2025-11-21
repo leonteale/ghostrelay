@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl mb-4">Manual Relay (Dry-Run)</h1>
+
+<div class="bg-gray-800 p-4 rounded max-w-xl mb-6">
+    <p class="mb-2">
+        Use this form to trigger a dry-run relay for any captured session.
+        The real heavy lifting still happens on the CLI side, this is a safe preview.
+    </p>
+
+    <label class="block mb-2 text-sm">
+        Session ID
+        <select id="sessionId" class="w-full p-2 mt-1 text-black rounded">
+            {% for s in sessions %}
+            <option value="{{ s.id }}">
+                {{ s.id }} — {{ s.username or "unknown" }} ({{ s.source_ip }})
+            </option>
+            {% endfor %}
+        </select>
+    </label>
+
+    <label class="block mb-2 text-sm mt-3">
+        Target host (SMB)
+        <input id="targetHost"
+               class="w-full p-2 mt-1 text-black rounded"
+               placeholder="10.160.214.112">
+    </label>
+
+    <button id="relayBtn"
+            class="bg-blue-600 px-4 py-2 mt-3 rounded">
+        Run relay dry-run
+    </button>
+
+    <p id="relayResult" class="mt-3 text-sm text-gray-300"></p>
+</div>
+
+<p class="text-sm text-gray-400">
+    Tip: You can also relay directly from the <a href="/sessions/" class="text-blue-400 underline">Sessions</a> page
+    using the Relay button next to each session.
+</p>
+
+<script>
+async function doRelay() {
+    const sessionId = document.getElementById("sessionId").value;
+    const host = document.getElementById("targetHost").value.trim();
+    const out = document.getElementById("relayResult");
+
+    if (!host) {
+        out.textContent = "Please enter a target host.";
+        out.className = "mt-3 text-sm text-red-400";
+        return;
+    }
+
+    out.textContent = "Running dry-run relay…";
+    out.className = "mt-3 text-sm text-gray-300";
+
+    const res = await fetch("/relay/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: parseInt(sessionId), host })
+    });
+
+    if (res.ok) {
+        out.textContent = "Dry-run complete. Check your GhostRelay console for details.";
+        out.className = "mt-3 text-sm text-green-400";
+    } else {
+        out.textContent = "Relay failed. Check server logs for details.";
+        out.className = "mt-3 text-sm text-red-400";
+    }
+}
+
+document.getElementById("relayBtn").addEventListener("click", doRelay);
+</script>
+
+{% endblock %}
+

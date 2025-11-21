@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl mb-4">Captured Sessions</h1>
+
+<table class="table-auto w-full bg-gray-800 rounded" id="sessionTable">
+    <thead>
+        <tr class="bg-gray-700">
+            <th>ID</th>
+            <th>Source</th>
+            <th>User</th>
+            <th>Type</th>
+            <th>Relay</th>
+        </tr>
+    </thead>
+    <tbody id="sessionBody">
+        <!-- JS will populate -->
+    </tbody>
+</table>
+
+<script>
+async function refreshSessions() {
+    const res = await fetch("/sessions/api");
+    const sessions = await res.json();
+
+    const tbody = document.getElementById("sessionBody");
+    tbody.innerHTML = "";
+
+    sessions.forEach(s => {
+        const row = document.createElement("tr");
+        row.className = "border-b border-gray-700";
+
+        row.innerHTML = `
+            <td>${s.id}</td>
+            <td>${s.source_ip}</td>
+            <td>${s.username || ""}</td>
+            <td>${s.message_type || ""}</td>
+            <td>
+                <button onclick="relaySession(${s.id})"
+                    class="bg-blue-600 px-3 py-1 rounded">
+                    Relay
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+async function relaySession(id) {
+    const host = prompt("Relay to which SMB host?");
+    if (!host) return;
+
+    await fetch("/relay/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: id, host })
+    });
+
+    alert("Relay dry-run executed. Check console.");
+}
+
+// Auto-refresh every 3 seconds
+setInterval(refreshSessions, 3000);
+refreshSessions();
+</script>
+
+{% endblock %}
+

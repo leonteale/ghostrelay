@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl mb-4">Scan SMB Targets</h1>
+
+<div class="bg-gray-800 p-4 rounded max-w-xl">
+    <p class="mb-2">Enter host(s) or subnet:</p>
+    <input id="targets" class="w-full p-2 text-black rounded"
+           placeholder="192.168.1.10, 192.168.1.23, 192.168.1.0/24">
+
+    <button onclick="runScan()"
+            class="bg-blue-600 px-3 py-2 mt-3 rounded">Scan</button>
+</div>
+
+<h2 class="text-xl mt-6 mb-2">Results</h2>
+
+<table class="table-auto w-full bg-gray-800 rounded">
+    <thead>
+        <tr class="bg-gray-700">
+            <th>Host</th>
+            <th>Signing</th>
+        </tr>
+    </thead>
+    <tbody id="targetBody">
+    </tbody>
+</table>
+
+<script>
+async function runScan() {
+    const text = document.getElementById("targets").value;
+    const hosts = text.split(",").map(x => x.trim());
+
+    const res = await fetch("/targets/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hosts })
+    });
+
+    const data = await res.json();
+    const tbody = document.getElementById("targetBody");
+    tbody.innerHTML = "";
+
+    data.forEach(t => {
+        const row = document.createElement("tr");
+        row.className = "border-b border-gray-700";
+
+        const status = t.signing_required === false
+            ? "Disabled (Relay OK)"
+            : t.signing_required === true
+              ? "Required (Blocked)"
+              : "Unknown";
+
+        row.innerHTML = `<td>${t.host}</td><td>${status}</td>`;
+        tbody.appendChild(row);
+    });
+}
+</script>
+
+{% endblock %}
+

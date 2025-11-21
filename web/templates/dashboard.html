@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-3xl font-bold mb-6">GhostRelay Dashboard</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- RESPONDER CONTROL -->
+    <div class="bg-gray-800 p-4 rounded shadow">
+        <h2 class="text-xl font-semibold mb-3">Responder Control</h2>
+
+        <div id="responderStatus" class="mb-3 text-yellow-300">
+            Checking status...
+        </div>
+
+        <button onclick="startCapture()"
+            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded mb-2 w-full">
+            Start Capture Mode
+        </button>
+
+        <button onclick="stopCapture()"
+            class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded w-full">
+            Stop Capture
+        </button>
+    </div>
+
+    <!-- LIVE LOGS -->
+    <div class="bg-gray-800 p-4 rounded shadow col-span-1 md:col-span-2">
+        <h2 class="text-xl font-semibold mb-3">Live Responder Logs</h2>
+
+        <pre id="logBox"
+             class="bg-black text-green-400 p-3 rounded h-64 overflow-y-scroll text-sm font-mono whitespace-pre-wrap">
+Loading logs...
+        </pre>
+    </div>
+
+    <!-- CAPTURED SESSIONS -->
+    <div class="bg-gray-800 p-4 rounded shadow col-span-1 md:col-span-2">
+        <h2 class="text-xl font-semibold mb-3">Captured Sessions</h2>
+
+        <table class="table-auto w-full bg-gray-900 rounded text-sm">
+            <thead>
+                <tr class="bg-gray-700 text-left">
+                    <th class="px-2 py-1">ID</th>
+                    <th class="px-2 py-1">Client IP</th>
+                    <th class="px-2 py-1">Target / Resource</th>
+                    <th class="px-2 py-1">User</th>
+                    <th class="px-2 py-1">Domain</th>
+                    <th class="px-2 py-1">Hash Type</th>
+                    <th class="px-2 py-1">Relay</th>
+                </tr>
+            </thead>
+            <tbody id="sessionTable"></tbody>
+        </table>
+    </div>
+
+    <!-- HASH EXPORT -->
+    <div class="bg-gray-800 p-4 rounded shadow">
+        <h2 class="text-xl font-semibold mb-3">Export Hashes</h2>
+
+        <button onclick="loadHashes()"
+            class="bg-blue-600 hover:bg-blue-700 w-full px-4 py-2 rounded mb-3">
+            Load Captured Hashes
+        </button>
+
+        <button onclick="copyHashes()"
+            class="bg-gray-600 hover:bg-gray-700 w-full px-4 py-2 rounded mb-3 text-sm">
+            Copy to clipboard (hashcat format)
+        </button>
+
+        <textarea id="hashBox"
+            class="w-full h-40 bg-black text-green-400 p-3 rounded font-mono text-xs"
+            placeholder="Hashes will appear here for copy/paste..."></textarea>
+    </div>
+
+</div>
+
+<script>
+
+function clean(val) {
+    if (!val) return "";
+    return val.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").trim();
+}
+
+/* --------------------------
+   RESPONDER STATUS
+--------------------------- */
+async function refreshResponderStatus() {
+    const res = await fetch("/capture/status");
+    const data = await res.json();
+    const box = document.getElementById("responderStatus");
+
+    if (data.running) {
+        box.textContent = "Responder: RUNNING";
+        box.className = "mb-3 text-green-300";
+    } else {
+        box.textContent = "Responder: STOPPED";
+        box.className = "mb-3 text-red-300";
+    }
+}
+
+async function startCapture() {
+    await fetch("/capture/start", { method: "POST" });
+    refreshResponderStatus();
+}
+
+async function stopCapture() {
+    await fetch("/capture/stop", { method: "POST" });
+    refreshResponderStatus();
+}
+
+/* --------------------------
+   LIVE LOG STREAM
+--------------------------- */
+async function refreshLogs() {
+    const res = await fetch("/capture/logs");
+    const text = await res.text();
+
+    const box = document.getElementById("logBox");
+    box.textContent = text;
+    box.scrollTop = box.scrollHeight;
+}
+
+/* --------------------------
+   LIVE SESSION TABLE
+--------------------------- */
+async function refreshSessions() {
+    const res = await fetch("/sessions/api");
+    const sessions = await res.json();
+
+    const table = document.getElementById("sessionTable");
+    table.innerHTML = "";
+
+    sessions.forEach(s => {
+        const row = document.createElement("tr");
+        row.className = "border-b border-gray-700";
+
+        row.innerHTML = `
+            <td class="px-2 py-1">${s.id}</td>
+            <td class="px-2 py-1">${clean(s.source_ip)}</td>
+            <td class="px-2 py-1">${clean(s.dest_ip)}</td>
+            <td class="px-2 py-1">${clean(s.username)}</td>
+            <td class="px-2 py-1">${clean(s.domain)}</td>
+            <td class="px-2 py-1">${clean(s.hash_type)}</td>
+            <td class="px-2 py-1">
+                ${
+                    s.hash_type === "NetNTLMv2"
+                    ? `<button onclick="relay(${s.id})" class="bg-blue-600 px-2 py-1 rounded text-xs">Relay</button>`
+                    : ""
+                }
+            </td>
+        `;
+
+        table.appendChild(row);
+    });
+}
+
+/* --------------------------
+   HASH EXPORT
+--------------------------- */
+async function loadHashes() {
+    const res = await fetch("/sessions/hashes");
+    const txt = await res.text();
+    document.getElementById("hashBox").value = txt;
+}
+
+setInterval(loadHashes, 2000);
+loadHashes();
+
+async function copyHashes() {
+    const txt = document.getElementById("hashBox").value;
+    if (!txt) return;
+
+    try {
+        await navigator.clipboard.writeText(txt);
+        alert("Hashes copied to clipboard (hashcat format).");
+    } catch (e) {
+        alert("Clipboard blocked. Hashes remain in the box below.");
+    }
+}
+
+/* --------------------------
+   RELAY
+--------------------------- */
+async function relay(id) {
+    const host = prompt("Relay NTLM to which SMB host?");
+    if (!host) return;
+
+    await fetch("/relay/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: id, host })
+    });
+
+    alert("Relay request sent. Check log or console.");
+}
+
+/* -----------------------------
+   AUTO REFRESH EVERY 2 sec
+------------------------------ */
+setInterval(refreshResponderStatus, 2000);
+setInterval(refreshLogs, 2000);
+setInterval(refreshSessions, 2000);
+
+refreshResponderStatus();
+refreshLogs();
+refreshSessions();
+
+</script>
+
+<button onclick="clearSessions()" class="bg-red-700 px-3 py-2 mt-3 rounded w-full">
+    Clear All Sessions
+</button>
+
+<script>
+async function clearSessions() {
+    await fetch("/sessions/clear", { method: "POST" });
+    refreshSessions();
+    loadHashes();
+}
+</script>
+
+{% endblock %}
+

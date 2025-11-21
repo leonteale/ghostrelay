@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-2xl mb-4">Responder Capture</h1>
+
+<div class="bg-gray-800 p-4 rounded max-w-xl">
+    <p class="mb-2">
+        Control GhostRelay capture mode. This will start/stop Responder in capture mode
+        using the CLI under the hood.
+    </p>
+
+    <div class="flex gap-3 mt-4">
+        <button id="startBtn"
+                class="bg-green-600 px-4 py-2 rounded">
+            Start Capture
+        </button>
+        <button id="stopBtn"
+                class="bg-red-600 px-4 py-2 rounded">
+            Stop Capture
+        </button>
+    </div>
+
+    <p id="statusText" class="mt-4 text-sm text-gray-300">
+        Status: <span id="statusValue">Unknown</span>
+    </p>
+</div>
+
+<script>
+async function updateStatus() {
+    const res = await fetch("/capture/status");
+    const data = await res.json();
+    document.getElementById("statusValue").textContent =
+        data.running ? "Running" : "Stopped";
+}
+
+async function startCapture() {
+    await fetch("/capture/start", { method: "POST" });
+    updateStatus();
+}
+
+async function stopCapture() {
+    await fetch("/capture/stop", { method: "POST" });
+    updateStatus();
+}
+
+document.getElementById("startBtn").addEventListener("click", startCapture);
+document.getElementById("stopBtn").addEventListener("click", stopCapture);
+
+// poll every few seconds
+updateStatus();
+setInterval(updateStatus, 5000);
+</script>
+
+{% endblock %}
+
