@@ -1,104 +1,177 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h1 class="text-3xl font-bold mb-6">GhostRelay Dashboard</h1>
+<div class="flex items-center justify-between mb-6 gap-4">
+    <div>
+        <h1 class="text-2xl md:text-3xl font-semibold tracking-tight">GhostRelay Dashboard</h1>
+        <p class="text-sm text-slate-400 mt-1">
+            Monitor Responder activity, captured sessions and hashes in real time.
+        </p>
+    </div>
+</div>
 
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="space-y-6">
 
-    <!-- RESPONDER CONTROL -->
-    <div class="bg-gray-800 p-4 rounded shadow">
-        <h2 class="text-xl font-semibold mb-3">Responder Control</h2>
+    <!-- Top row: Responder control + live logs -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Responder Control -->
+        <div class="lg:col-span-1">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/30 backdrop-blur-sm">
+                <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <span class="inline-flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Responder Control
+                </h2>
 
-        <div id="responderStatus" class="mb-3 text-yellow-300">
-            Checking status...
+                <div id="responderStatus" class="mb-4 text-sm text-yellow-300">
+                    Checking status…
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button
+                        onclick="startCapture()"
+                        class="flex-1 inline-flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium shadow-md shadow-emerald-900/50 transition-transform duration-150 hover:-translate-y-px"
+                    >
+                        Start Capture Mode
+                    </button>
+                    <button
+                        onclick="stopCapture()"
+                        class="flex-1 inline-flex items-center justify-center rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-sm font-medium shadow-md shadow-rose-900/50 transition-transform duration-150 hover:-translate-y-px"
+                    >
+                        Stop Capture
+                    </button>
+                </div>
+
+                <p class="mt-4 text-xs text-slate-500">
+                    Use only on authorised internal assessments. Responder configuration is handled automatically.
+                </p>
+            </div>
         </div>
 
-        <button onclick="startCapture()"
-            class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded mb-2 w-full">
-            Start Capture Mode
-        </button>
+        <!-- Live Responder Logs -->
+        <div class="lg:col-span-2">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/30 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold">Live Responder Logs</h2>
+                    <span class="text-[11px] uppercase tracking-wide text-slate-500">
+                        Tail of <code class="text-slate-400">ghostrelay.log</code>
+                    </span>
+                </div>
 
-        <button onclick="stopCapture()"
-            class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded w-full">
-            Stop Capture
-        </button>
+                <div class="relative">
+                    <pre
+                        id="logBox"
+                        class="h-72 w-full overflow-auto rounded-xl bg-black/80 text-[11px] leading-snug p-3 font-mono text-emerald-300 border border-slate-800 shadow-inner"
+                    ></pre>
+                    <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-slate-900/40"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- LIVE LOGS -->
-    <div class="bg-gray-800 p-4 rounded shadow col-span-1 md:col-span-2">
-        <h2 class="text-xl font-semibold mb-3">Live Responder Logs</h2>
+    <!-- Bottom row: Sessions + Hash export -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <!-- Captured Sessions -->
+        <div class="xl:col-span-2">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/30 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold">Captured Sessions</h2>
+                    <span class="text-xs text-slate-500">NetNTLMv2, Basic, clear-text where applicable</span>
+                </div>
 
-        <pre id="logBox"
-             class="bg-black text-green-400 p-3 rounded h-64 overflow-y-scroll text-sm font-mono whitespace-pre-wrap">
-Loading logs...
-        </pre>
+                <div class="overflow-hidden rounded-xl border border-slate-800">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-900/90">
+                            <tr class="text-left text-xs uppercase tracking-wide text-slate-400">
+                                <th class="px-3 py-2">ID</th>
+                                <th class="px-3 py-2">Client IP</th>
+                                <th class="px-3 py-2">Target / Resource</th>
+                                <th class="px-3 py-2">User</th>
+                                <th class="px-3 py-2">Domain</th>
+                                <th class="px-3 py-2">Hash Type</th>
+                                <th class="px-3 py-2 text-right">Relay</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessionTable" class="bg-slate-950/60 divide-y divide-slate-800">
+                            <!-- Rows injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <button
+                    onclick="clearSessions()"
+                    class="mt-4 w-full inline-flex items-center justify-center rounded-xl bg-rose-700 hover:bg-rose-600 px-4 py-2 text-sm font-medium shadow-md shadow-rose-900/50 transition-transform duration-150 hover:-translate-y-px"
+                >
+                    Clear All Sessions &amp; Logs
+                </button>
+            </div>
+        </div>
+
+        <!-- Export Hashes -->
+        <div class="xl:col-span-1">
+            <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg shadow-black/30 backdrop-blur-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold">Export Hashes</h2>
+                    <span class="text-xs text-slate-500">Hashcat-ready format</span>
+                </div>
+
+                <div class="flex flex-col gap-3 mb-3">
+                    <button
+                        onclick="loadHashes()"
+                        class="inline-flex items-center justify-center rounded-xl bg-sky-600 hover:bg-sky-500 px-4 py-2 text-sm font-medium shadow-md shadow-sky-900/50 transition-transform duration-150 hover:-translate-y-px"
+                    >
+                        Load Captured Hashes
+                    </button>
+                    <button
+                        onclick="copyHashes()"
+                        class="inline-flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm font-medium border border-slate-700 transition-transform duration-150 hover:-translate-y-px"
+                    >
+                        Copy to clipboard (hashcat format)
+                    </button>
+                </div>
+
+                <div class="relative">
+                    <pre
+                        id="hashBox"
+                        class="h-56 w-full overflow-auto rounded-xl bg-black/85 text-[11px] leading-snug p-3 font-mono text-emerald-300 border border-slate-800 shadow-inner"
+                    ></pre>
+                    <div class="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-slate-900/40"></div>
+                </div>
+            </div>
+        </div>
     </div>
-
-    <!-- CAPTURED SESSIONS -->
-    <div class="bg-gray-800 p-4 rounded shadow col-span-1 md:col-span-2">
-        <h2 class="text-xl font-semibold mb-3">Captured Sessions</h2>
-
-        <table class="table-auto w-full bg-gray-900 rounded text-sm">
-            <thead>
-                <tr class="bg-gray-700 text-left">
-                    <th class="px-2 py-1">ID</th>
-                    <th class="px-2 py-1">Client IP</th>
-                    <th class="px-2 py-1">Target / Resource</th>
-                    <th class="px-2 py-1">User</th>
-                    <th class="px-2 py-1">Domain</th>
-                    <th class="px-2 py-1">Hash Type</th>
-                    <th class="px-2 py-1">Relay</th>
-                </tr>
-            </thead>
-            <tbody id="sessionTable"></tbody>
-        </table>
-    </div>
-
-    <!-- HASH EXPORT -->
-    <div class="bg-gray-800 p-4 rounded shadow">
-        <h2 class="text-xl font-semibold mb-3">Export Hashes</h2>
-
-        <button onclick="loadHashes()"
-            class="bg-blue-600 hover:bg-blue-700 w-full px-4 py-2 rounded mb-3">
-            Load Captured Hashes
-        </button>
-
-        <button onclick="copyHashes()"
-            class="bg-gray-600 hover:bg-gray-700 w-full px-4 py-2 rounded mb-3 text-sm">
-            Copy to clipboard (hashcat format)
-        </button>
-
-        <textarea id="hashBox"
-            class="w-full h-40 bg-black text-green-400 p-3 rounded font-mono text-xs"
-            placeholder="Hashes will appear here for copy/paste..."></textarea>
-    </div>
-
 </div>
 
 <script>
-
-function clean(val) {
-    if (!val) return "";
-    return val.replace(/\x1B\[[0-9;]*[A-Za-z]/g, "").trim();
-}
-
 /* --------------------------
    RESPONDER STATUS
 --------------------------- */
 async function refreshResponderStatus() {
-    const res = await fetch("/capture/status");
-    const data = await res.json();
-    const box = document.getElementById("responderStatus");
+    try {
+        const res = await fetch("/capture/status");
+        const data = await res.json();
+        const box = document.getElementById("responderStatus");
 
-    if (data.running) {
-        box.textContent = "Responder: RUNNING";
-        box.className = "mb-3 text-green-300";
-    } else {
-        box.textContent = "Responder: STOPPED";
-        box.className = "mb-3 text-red-300";
+        if (!box) return;
+
+        if (data.running) {
+            box.textContent = "Responder: RUNNING";
+            box.className = "mb-4 text-sm text-emerald-300";
+        } else {
+            box.textContent = "Responder: STOPPED";
+            box.className = "mb-4 text-sm text-rose-300";
+        }
+    } catch (e) {
+        const box = document.getElementById("responderStatus");
+        if (box) {
+            box.textContent = "Responder: UNKNOWN (status error)";
+            box.className = "mb-4 text-sm text-amber-300";
+        }
     }
 }
 
+/* --------------------------
+   START / STOP CAPTURE
+--------------------------- */
 async function startCapture() {
     await fetch("/capture/start", { method: "POST" });
     refreshResponderStatus();
@@ -113,45 +186,86 @@ async function stopCapture() {
    LIVE LOG STREAM
 --------------------------- */
 async function refreshLogs() {
-    const res = await fetch("/capture/logs");
-    const text = await res.text();
+    try {
+        const res = await fetch("/capture/logs");
+        const text = await res.text();
+        const box = document.getElementById("logBox");
+        if (!box) return;
 
-    const box = document.getElementById("logBox");
-    box.textContent = text;
-    box.scrollTop = box.scrollHeight;
+        const atBottom =
+            box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+
+        box.textContent = text || "";
+
+        if (atBottom) {
+            box.scrollTop = box.scrollHeight;
+        }
+    } catch (e) {
+        // Silent fail; next poll will retry
+    }
 }
 
 /* --------------------------
    LIVE SESSION TABLE
 --------------------------- */
 async function refreshSessions() {
-    const res = await fetch("/sessions/api");
-    const sessions = await res.json();
+    try {
+        const res = await fetch("/sessions/api");
+        const sessions = await res.json();
+        const table = document.getElementById("sessionTable");
+        if (!table) return;
 
-    const table = document.getElementById("sessionTable");
-    table.innerHTML = "";
+        table.innerHTML = "";
 
-    sessions.forEach(s => {
-        const row = document.createElement("tr");
-        row.className = "border-b border-gray-700";
+        sessions.forEach((s) => {
+            const row = document.createElement("tr");
+            row.className =
+                "hover:bg-slate-900/80 transition-colors duration-100";
 
-        row.innerHTML = `
-            <td class="px-2 py-1">${s.id}</td>
-            <td class="px-2 py-1">${clean(s.source_ip)}</td>
-            <td class="px-2 py-1">${clean(s.dest_ip)}</td>
-            <td class="px-2 py-1">${clean(s.username)}</td>
-            <td class="px-2 py-1">${clean(s.domain)}</td>
-            <td class="px-2 py-1">${clean(s.hash_type)}</td>
-            <td class="px-2 py-1">
-                ${
-                    s.hash_type === "NetNTLMv2"
-                    ? `<button onclick="relay(${s.id})" class="bg-blue-600 px-2 py-1 rounded text-xs">Relay</button>`
-                    : ""
-                }
-            </td>
-        `;
+            const username = s.username || "";
+            const domain = s.domain || "";
+            const hashType = s.hash_type || "";
+            const target = s.dest_ip || "";
 
-        table.appendChild(row);
+            row.innerHTML = `
+                <td class="px-3 py-2 text-xs text-slate-400">${s.id}</td>
+                <td class="px-3 py-2 font-mono text-xs">${s.source_ip || ""}</td>
+                <td class="px-3 py-2 text-xs">${target}</td>
+                <td class="px-3 py-2 text-xs">${username}</td>
+                <td class="px-3 py-2 text-xs">${domain}</td>
+                <td class="px-3 py-2 text-xs">${hashType}</td>
+                <td class="px-3 py-2 text-xs text-right">
+                    ${
+                        hashType
+                            ? `<button onclick="relay(${s.id})"
+                                 class="inline-flex items-center rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1 text-[11px] font-medium shadow-sm shadow-emerald-900/60 transition-transform duration-100 hover:-translate-y-px">
+                                 Relay
+                               </button>`
+                            : ""
+                    }
+                </td>
+            `;
+
+            table.appendChild(row);
+        });
+    } catch (e) {
+        // ignore; next poll retries
+    }
+}
+
+/* --------------------------
+   RELAY ACTION
+--------------------------- */
+async function relay(sessionId) {
+    const host = prompt(
+        "Relay this credential to which SMB host? (IP or hostname)"
+    );
+    if (!host) return;
+
+    await fetch("/relay/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId, host: host }),
     });
 }
 
@@ -159,65 +273,56 @@ async function refreshSessions() {
    HASH EXPORT
 --------------------------- */
 async function loadHashes() {
-    const res = await fetch("/sessions/hashes");
-    const txt = await res.text();
-    document.getElementById("hashBox").value = txt;
+    try {
+        const res = await fetch("/sessions/hashes");
+        const text = await res.text();
+        const box = document.getElementById("hashBox");
+        if (!box) return;
+        box.textContent = text || "";
+    } catch (e) {
+        // ignore
+    }
 }
 
-setInterval(loadHashes, 2000);
-loadHashes();
-
 async function copyHashes() {
-    const txt = document.getElementById("hashBox").value;
-    if (!txt) return;
+    const box = document.getElementById("hashBox");
+    if (!box) return;
+    const text = box.textContent || "";
+
+    if (!text.trim()) return;
 
     try {
-        await navigator.clipboard.writeText(txt);
-        alert("Hashes copied to clipboard (hashcat format).");
+        await navigator.clipboard.writeText(text);
     } catch (e) {
-        alert("Clipboard blocked. Hashes remain in the box below.");
+        // ignore
     }
 }
 
 /* --------------------------
-   RELAY
+   CLEAR SESSIONS + LOGS
 --------------------------- */
-async function relay(id) {
-    const host = prompt("Relay NTLM to which SMB host?");
-    if (!host) return;
-
-    await fetch("/relay/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: id, host })
-    });
-
-    alert("Relay request sent. Check log or console.");
-}
-
-/* -----------------------------
-   AUTO REFRESH EVERY 2 sec
------------------------------- */
-setInterval(refreshResponderStatus, 2000);
-setInterval(refreshLogs, 2000);
-setInterval(refreshSessions, 2000);
-
-refreshResponderStatus();
-refreshLogs();
-refreshSessions();
-
-</script>
-
-<button onclick="clearSessions()" class="bg-red-700 px-3 py-2 mt-3 rounded w-full">
-    Clear All Sessions
-</button>
-
-<script>
 async function clearSessions() {
     await fetch("/sessions/clear", { method: "POST" });
     refreshSessions();
     loadHashes();
+
+    // Instantly blank the visible log pane too
+    const logBox = document.getElementById("logBox");
+    if (logBox) {
+        logBox.textContent = "";
+    }
 }
+
+/* --------------------------
+   POLLING SETUP
+--------------------------- */
+refreshResponderStatus();
+refreshLogs();
+refreshSessions();
+// Hashes are loaded on demand, but we can keep them fresh periodically too
+setInterval(refreshResponderStatus, 2000);
+setInterval(refreshLogs, 2000);
+setInterval(refreshSessions, 4000);
 </script>
 
 {% endblock %}
